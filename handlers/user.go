@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/EduardoZepeda/goRestWebSocketExample/models"
@@ -33,7 +34,7 @@ type SignUpResponse struct {
 }
 
 type LoginResponse struct {
-	Token string `json: "token"`
+	Token string `json:"token"`
 }
 
 func SignUpHandler(s server.Server) http.HandlerFunc {
@@ -44,7 +45,7 @@ func SignUpHandler(s server.Server) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		// requires a slice of bytes
+		// GenerateFromPassword requires a slice of bytes, HASH_COST is optional.
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), HASH_COST)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -56,7 +57,7 @@ func SignUpHandler(s server.Server) http.HandlerFunc {
 		}
 		var user = models.User{
 			Email: request.Email,
-			// hashed password is slice of bytes
+			// hashed password is slice of bytes, hence the need for convertion
 			Password: string(hashedPassword),
 			Id:       id.String(),
 		}
@@ -75,6 +76,7 @@ func SignUpHandler(s server.Server) http.HandlerFunc {
 
 func LoginHandler(s server.Server) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Get Password and Email
 		var request = SignUpLoginRequest{}
 		err := json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
@@ -88,17 +90,20 @@ func LoginHandler(s server.Server) http.HandlerFunc {
 		if user == nil {
 			http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 		}
+		// CompareHashAndPassword require a slice of bytes
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(request.Password)); err != nil {
 			http.Error(w, "invalid credentials", http.StatusUnauthorized)
 			return
 		}
+		// It seems that StandardClaims is deprecated and should be replaced with RegisteredClaims, which got more fields
 		claims := models.AppClaims{
 			UserId: user.Id,
 			StandardClaims: jwt.StandardClaims{
 				ExpiresAt: time.Now().Add(2 * time.Hour * 24).Unix(),
 			},
 		}
-		token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+		//SigningMethodES256 is different than SigningMethodHS256, the later doesn't require a RSA Priv Key as a Signed String
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 		tokenString, err := token.SignedString([]byte(s.Config().JWTSecret))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -107,5 +112,30 @@ func LoginHandler(s server.Server) http.HandlerFunc {
 		json.NewEncoder(w).Encode(LoginResponse{
 			Token: tokenString,
 		})
+	}
+}
+
+func MeHandler(s server.Server) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tokenString := strings.TrimSpace(r.Header.Get("Authorization"))
+		token, err := jwt.ParseWithClaims(tokenString, &models.AppClaims{}, func(token *jwt.Token) (interface{}, error) {
+			return []byte(s.Config().JWTSecret), nil
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		if claims, ok := token.Claims.(*models.AppClaims); ok && token.Valid {
+			user, err := repository.GetUserById(r.Context(), claims.UserId)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(user)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }

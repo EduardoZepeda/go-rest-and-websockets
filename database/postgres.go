@@ -68,7 +68,7 @@ func (repo *PostgresRepository) GetUserByEmail(ctx context.Context, email string
 	var user = models.User{}
 	// this scans the content from rows into the previously created user instance
 	for rows.Next() {
-		if err := rows.Scan(&user.Id, &user.Email); err == nil {
+		if err := rows.Scan(&user.Id, &user.Email, &user.Password); err == nil {
 			return &user, nil
 		}
 	}
@@ -77,5 +77,3 @@ func (repo *PostgresRepository) GetUserByEmail(ctx context.Context, email string
 	}
 	return &user, nil
 }
-
-
