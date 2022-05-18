@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"strconv"
+
 	"github.com/EduardoZepeda/goRestWebSocketExample/models"
 	"github.com/EduardoZepeda/goRestWebSocketExample/repository"
 	"github.com/EduardoZepeda/goRestWebSocketExample/server"
@@ -144,5 +146,39 @@ func DeletePostHandler(s server.Server) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+	}
+}
+
+func ListPostHandler(s server.Server) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		pageStr := r.URL.Query().Get("page")
+		sizeStr := r.URL.Query().Get("size")
+
+		var page = uint64(0)
+		// Default offset value of 10
+		var size = uint64(10)
+
+		if pageStr != "" {
+			page, err = strconv.ParseUint(pageStr, 10, 64)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+		if sizeStr != "" {
+			size, err = strconv.ParseUint(sizeStr, 10, 64)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+		posts, err := repository.ListPost(r.Context(), page, size)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(posts)
 	}
 }
