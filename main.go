@@ -9,7 +9,6 @@ import (
 	"github.com/EduardoZepeda/goRestWebSocketExample/handlers"
 	"github.com/EduardoZepeda/goRestWebSocketExample/middleware"
 	"github.com/EduardoZepeda/goRestWebSocketExample/server"
-	"github.com/EduardoZepeda/goRestWebSocketExample/websocket"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
@@ -38,7 +37,6 @@ func main() {
 }
 
 func BindRoutes(s server.Server, r *mux.Router) {
-	hub := websocket.NewHub()
 	r.Use(middleware.CheckAuthMiddleware(s))
 	r.HandleFunc("/", handlers.HomeHandler(s)).Methods(http.MethodGet)
 	r.HandleFunc("/signup", handlers.SignUpHandler(s)).Methods(http.MethodPost)
@@ -49,5 +47,5 @@ func BindRoutes(s server.Server, r *mux.Router) {
 	r.HandleFunc("/posts/{id}", handlers.GetPostByIdHandler(s)).Methods(http.MethodGet)
 	r.HandleFunc("/posts/{id}", handlers.UpdatePostHandler(s)).Methods(http.MethodPut)
 	r.HandleFunc("/posts/{id}", handlers.DeletePostHandler(s)).Methods(http.MethodDelete)
-	r.HandleFunc("/ws", hub.HandleWebsocket)
+	r.HandleFunc("/ws", s.Hub().HandleWebsocket)
 }
