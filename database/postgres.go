@@ -117,7 +117,7 @@ func (repo *PostgresRepository) DeletePost(ctx context.Context, id string, userI
 }
 
 func (repo *PostgresRepository) ListPost(ctx context.Context, page uint64, size uint64) ([]*models.Post, error) {
-	rows, err := repo.db.QueryContext(ctx, "SELECT id, post_content, user_id, created_at FROM posts LIMIT $1 OFFSET $2", size, page*size)
+	rows, err := repo.db.QueryContext(ctx, "SELECT id, post_content, user_id, created_at FROM posts ORDER BY created_at DESC LIMIT $1 OFFSET $2 ", size, page*size)
 	if err != nil {
 		return nil, err
 	}
